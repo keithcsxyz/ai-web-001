@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=()" />
+    <title>AI Detector - Age, Mood & Object</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <h1>AI Web App - Real-time Detection</h1>
+    <div class="glass-container">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="overlay"></canvas>
+    </div>
+
+    <!-- ✅ Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"
+    ></script>
+
+    <!-- ✅ Your app logic -->
+    <script defer>
+      window.onload = () => {
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("overlay");
+        const ctx = canvas.getContext("2d");
+        let cocoModel;
+
+        async function startVideo() {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+            });
+            video.srcObject = stream;
+          } catch (err) {
+            alert("Camera access denied");
+            console.error(err);
+          }
+        }
+
+        async function loadModels() {
+          await faceapi.nets.tinyFaceDetector.loadFromUri(
+            "models/tiny_face_detector_model"
+          );
+          await faceapi.nets.ageGenderNet.loadFromUri(
+            "models/age_gender_model"
+          );
+          await faceapi.nets.faceExpressionNet.loadFromUri(
+            "models/face_expression_model"
+          );
+          cocoModel = await cocoSsd.load();
+          startVideo();
+        }
+
+        video.addEventListener("playing", () => {
+          const displaySize = {
+            width: video.videoWidth,
+            height: video.videoHeight,
+          };
+          canvas.width = displaySize.width;
+          canvas.height = displaySize.height;
+          faceapi.matchDimensions(canvas, displaySize);
+
+          setInterval(async () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const detections = await faceapi
+              .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+              .withAgeAndGender()
+              .withFaceExpressions();
+
+            const resizedDetections = faceapi.resizeResults(
+              detections,
+              displaySize
+            );
+
+            resizedDetections.forEach((d) => {
+              const { age, gender, expressions, detection } = d;
+              const [emotion] = Object.entries(expressions).reduce((a, b) =>
+                a[1] > b[1] ? a : b
+              );
+              const text = `${gender}, ${Math.round(
+                age
+              )} y/o, Mood: ${emotion}`;
+              const { x, y, width, height } = detection.box;
+
+              ctx.strokeStyle = "#00ffff";
+              ctx.lineWidth = 2;
+              ctx.strokeRect(x, y, width, height);
+
+              ctx.fillStyle = "#00ffff";
+              ctx.font = "16px Inter";
+              ctx.fillText(text, x, y - 10);
+            });
+
+            const predictions = await cocoModel.detect(video);
+            predictions.forEach((pred) => {
+              const [x, y, w, h] = pred.bbox;
+              ctx.strokeStyle = "red";
+              ctx.strokeRect(x, y, w, h);
+              ctx.fillStyle = "red";
+              ctx.fillText(pred.class, x, y - 5);
+            });
+          }, 200);
+        });
+
+        window.addEventListener("DOMContentLoaded", () => {
+          loadModels();
+        });
+      };
+    </script>
+  </body>
+</html>
