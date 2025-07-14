@@ -4,7 +4,7 @@ This project requires serving the files from a local server to properly load the
 
 ## Option 1: Using Python HTTP Server (Python 3.x required)
 
-1. Open a terminal (Command Prompt or PowerShell) in the project directory (`c:/Users/rnzrm/Desktop/ai-detector`).
+1. Open a terminal (Command Prompt or PowerShell) in the project directory.
 2. Run the following command:
 
 ```bash
